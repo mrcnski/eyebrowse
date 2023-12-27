@@ -77,6 +77,16 @@ manager."
   :type 'string
   :group 'eyebrowse)
 
+(defcustom eyebrowse-mode-line-current-left-delimiter ""
+  "Left delimiter of the current window config in the mode line indicator."
+  :type 'string
+  :group 'eyebrowse)
+
+(defcustom eyebrowse-mode-line-current-right-delimiter ""
+  "Right delimiter of the current window config in the mode line indicator."
+  :type 'string
+  :group 'eyebrowse)
+
 (defcustom eyebrowse-mode-line-left-delimiter "["
   "Left delimiter of the mode line indicator."
   :type 'string
@@ -365,7 +375,7 @@ If a buffer name equal to OLD is found, it is replaced with NEW."
 A formatted list of window configs is presented as candidates.
 If no match was found, the user input is interpreted as a new
 slot to switch to."
-  (let* ((candidates (--map (cons (eyebrowse-format-slot it)
+  (let* ((candidates (--map (cons (eyebrowse-format-slot it nil)
                                   (car it))
                             (eyebrowse--get 'window-configs)))
          (candidate (completing-read "Enter slot: " candidates))
@@ -629,7 +639,8 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
     (define-key map (kbd "M-8") 'eyebrowse-switch-to-window-config-8)
     (define-key map (kbd "M-9") 'eyebrowse-switch-to-window-config-9)))
 
-(defun eyebrowse-format-slot (window-config)
+(defun eyebrowse-format-slot (window-config is-current)
+  "Format the slot at WINDOW-CONFIG, taking into account if IS-CURRENT."
   (let* ((slot (car window-config))
          (tag (nth 2 window-config))
          (format-string (if (and tag (> (length tag) 0))
@@ -640,8 +651,14 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
          ;; `eyebrowse-mode-line-indicator' always deactivate the mark
          ;; after activating it as this triggers mode line updates...
          deactivate-mark)
-    (format-spec format-string
-                 (format-spec-make ?s slot ?t tag))))
+    (let ((formatted (format-spec format-string
+                            (format-spec-make ?s slot ?t tag))))
+      (if is-current
+          (format "%s%s%s"
+                  eyebrowse-mode-line-current-left-delimiter
+                  formatted
+                  eyebrowse-mode-line-current-right-delimiter)
+        formatted))))
 
 (defun eyebrowse-mode-line-indicator ()
   "Return a string representation of the window configurations."
@@ -666,7 +683,8 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
          (mapconcat
           (lambda (window-config)
             (let* ((slot (car window-config))
-                   (face (if (= slot current-slot)
+                   (is-current (= slot current-slot))
+                   (face (if is-current
                              'eyebrowse-mode-line-active
                            'eyebrowse-mode-line-inactive))
                    (keymap
@@ -677,7 +695,7 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
                           (eyebrowse-switch-to-window-config slot)))
                       map))
                    (help-echo "mouse-1: Switch to indicated workspace")
-                   (caption (eyebrowse-format-slot window-config)))
+                   (caption (eyebrowse-format-slot window-config is-current)))
               (propertize caption 'face face 'slot slot
                           'mouse-face 'mode-line-highlight
                           'local-map keymap
