@@ -156,6 +156,18 @@ t: Clean up and display the scratch buffer."
   :type 'hook
   :group 'eyebrowse)
 
+(defcustom eyebrowse-indicator-change-hook nil
+  "Hook run when the visual indicator should change."
+  :type 'hook
+  :group 'eyebrowse)
+(run-with-timer 0 0.5 'run-hooks #'eyebrowse-indicator-change-hook)
+(advice-add 'delete-frame :after
+            #'(lambda (&rest _) (run-hooks 'eyebrowse-indicator-change-hook)))
+(advice-add 'make-frame :after
+            #'(lambda (&rest _) (run-hooks 'eyebrowse-indicator-change-hook)))
+(advice-add 'other-frame :after
+            #'(lambda (&rest _) (run-hooks 'eyebrowse-indicator-change-hook)))
+
 (defcustom eyebrowse-default-workspace-slot 1
   "Slot number assigned to the default workspace."
   :type 'integer
@@ -216,7 +228,7 @@ If t, ask for confirmation."
 (defun eyebrowse--get (type &optional frame)
   "Retrieve frame-specific value of TYPE.
 If FRAME is nil, use current frame.  TYPE can be any of
-'window-configs, 'current-slot, 'last-slot."
+`window-configs', `current-slot', `last-slot'."
   (cond
    ((eq type 'window-configs)
     (frame-parameter frame 'eyebrowse-window-configs))
@@ -228,15 +240,21 @@ If FRAME is nil, use current frame.  TYPE can be any of
 (defun eyebrowse--set (type value &optional frame)
   "Set frame-specific value of TYPE to VALUE.
 If FRAME is nil, use current frame.  TYPE can be any of
-'window-configs, 'current-slot, 'last-slot."
+`window-configs', `current-slot', `last-slot'."
   (cond
    ((eq type 'window-configs)
-    (set-frame-parameter frame 'eyebrowse-window-configs value))
+    (set-frame-parameter frame 'eyebrowse-window-configs value)
+    (run-hooks 'eyebrowse-indicator-change-hook))
    ((eq type 'current-slot)
-    (set-frame-parameter frame 'eyebrowse-current-slot value))
+    (set-frame-parameter frame 'eyebrowse-current-slot value)
+    (run-hooks 'eyebrowse-indicator-change-hook))
    ((eq type 'last-slot)
     (set-frame-parameter frame 'eyebrowse-last-slot value))))
 (put 'eyebrowse--set 'lisp-indent-function 1)
+
+(defun eyebrowse-current-slot ()
+    "Get the current slot number."
+    (eyebrowse--get 'current-slot))
 
 (defun eyebrowse-init (&optional frame)
   "Initialize Eyebrowse for the current frame."
@@ -391,7 +409,8 @@ last window config."
              ((functionp eyebrowse-new-workspace)
               (funcall eyebrowse-new-workspace))
              (t (switch-to-buffer "*scratch*"))))
-          (run-hooks 'eyebrowse-post-window-switch-hook))))))
+          (run-hooks 'eyebrowse-post-window-switch-hook
+                     'eyebrowse-indicator-change-hook))))))
 
 (defun eyebrowse-next-window-config (count)
   "Switch to the next available window config.
@@ -460,7 +479,8 @@ another appropriate window config."
         (eyebrowse-next-window-config nil))
       (run-hooks 'eyebrowse-pre-window-delete-hook)
       (eyebrowse--delete-window-config (eyebrowse--get 'last-slot))
-      (run-hooks 'eyebrowse-post-window-delete-hook))))
+      (run-hooks 'eyebrowse-post-window-delete-hook
+                 'eyebrowse-indicator-change-hook))))
 
 (defun eyebrowse-rename-window-config (slot tag)
   "Rename the window config at SLOT to TAG.
@@ -478,7 +498,8 @@ prefix argument to select a slot by its number."
          (window-config (assoc slot window-configs))
          (current-tag (nth 2 window-config))
          (tag (or tag (read-string "Tag: " current-tag))))
-    (setf (nth 2 window-config) tag)))
+    (setf (nth 2 window-config) tag)
+    (run-hooks 'eyebrowse-indicator-change-hook)))
 
 ;; NOTE I've tried out generating the respective commands dynamically
 ;; with a macro, but this ended in unreadable code and Emacs not being
