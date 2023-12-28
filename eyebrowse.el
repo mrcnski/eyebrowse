@@ -5,7 +5,7 @@
 ;; Author: Vasilij Schneidermann <mail@vasilij.de>
 ;; URL: https://depp.brause.cc/eyebrowse
 ;; Version: 0.7.8
-;; Package-Requires: ((dash "2.7.0") (emacs "24.3.1"))
+;; Package-Requires: ((dash "2.7.0") (emacs "24.4"))
 ;; Keywords: convenience
 
 ;; This file is NOT part of GNU Emacs.
@@ -170,7 +170,7 @@ t: Clean up and display the scratch buffer."
   "Hook run when the visual indicator should change."
   :type 'hook
   :group 'eyebrowse)
-(run-with-timer 0 0.5 'run-hooks #'eyebrowse-indicator-change-hook)
+(add-function :after after-focus-change-function #'(lambda () (run-hooks 'eyebrowse-indicator-change-hook)))
 (advice-add 'delete-frame :after
             #'(lambda (&rest _) (run-hooks 'eyebrowse-indicator-change-hook)))
 (advice-add 'make-frame :after
