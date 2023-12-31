@@ -3,7 +3,9 @@
 ;; Copyright (C) 2014 Vasilij Schneidermann <mail@vasilij.de>
 
 ;; Author: Vasilij Schneidermann <mail@vasilij.de>
-;; URL: https://depp.brause.cc/eyebrowse
+;;    Marcin Swieczkowski <marcin@realemail.net>
+;; Maintainer: Marcin Swieczkowski <marcin@realemail.net>
+;; URL: https://github.com/mrcnski/eyebrowse
 ;; Version: 0.8.0
 ;; Package-Requires: ((dash "2.7.0") (emacs "24.4"))
 ;; Keywords: convenience
