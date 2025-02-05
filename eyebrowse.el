@@ -209,9 +209,8 @@ If t, ask for confirmation."
   :type 'boolean
   :group 'eyebrowse)
 
-(defvar eyebrowse-mode-map
-  (let ((map (make-sparse-keymap))
-        (prefix-map (make-sparse-keymap)))
+(defvar eyebrowse-mode-prefix-map
+  (let ((prefix-map (make-sparse-keymap)))
     (define-key prefix-map (kbd "<") 'eyebrowse-prev-window-config)
     (define-key prefix-map (kbd ">") 'eyebrowse-next-window-config)
     (define-key prefix-map (kbd "'") 'eyebrowse-last-window-config)
@@ -230,7 +229,13 @@ If t, ask for confirmation."
     (define-key prefix-map (kbd "9") 'eyebrowse-switch-to-window-config-9)
     (define-key prefix-map (kbd "c") 'eyebrowse-create-window-config)
     (define-key prefix-map (kbd "C-c") 'eyebrowse-create-window-config)
-    (define-key map eyebrowse-keymap-prefix prefix-map)
+    prefix-map)
+  "Initial prefix key map for `eyebrowse-mode'."
+  )
+
+(defvar eyebrowse-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map eyebrowse-keymap-prefix eyebrowse-mode-prefix-map)
     map)
   "Initial key map for `eyebrowse-mode'.")
 
@@ -512,6 +517,56 @@ prefix argument to select a slot by its number."
          (tag (or tag (read-string "Tag: " current-tag))))
     (setf (nth 2 window-config) tag)
     (run-hooks 'eyebrowse-indicator-change-hook)))
+
+(defun eyebrowse-move-window-config (old-slot new-slot &optional overwrite-existing)
+  "Move a window config from OLD-SLOT to NEW-SLOT.
+Signal an error if OLD-SLOT is not occupied, or if NEW-SLOT is
+already occupied and OVERWRITE-EXISTING is nil.
+
+When used interactively, move the current window config to the
+slot given as a numerical prefix argument, or in response to the
+prompt shown if none is given."
+  (interactive (list (eyebrowse--get 'current-slot)
+                     (if (numberp current-prefix-arg)
+                         current-prefix-arg
+                       (read-number "Move to slot: "
+                                    (eyebrowse-free-slot
+                                     (mapcar 'car (eyebrowse--get 'window-configs)))))))
+  (when (/= old-slot new-slot)
+    (let ((new-slot-exists (eyebrowse--window-config-present-p new-slot)))
+      (unless (eyebrowse--window-config-present-p old-slot)
+        (user-error "No window configuration in slot %d" old-slot))
+      (when (and new-slot-exists (not overwrite-existing))
+        (user-error "Window configuration already exists in slot %d" new-slot))
+      (let* ((current-slot (eyebrowse--get 'current-slot))
+             (last-slot (eyebrowse--get 'last-slot))
+             (window-configs (eyebrowse--get 'window-configs))
+             (old-config-element (assoc old-slot window-configs))
+             (new-config-element (cons new-slot (cdr old-config-element))))
+        ;; write existing config+tag to new-slot
+        (if new-slot-exists
+            (eyebrowse--update-window-config-element new-config-element)
+          (eyebrowse--insert-in-window-config-list new-config-element))
+        ;; update current-slot if equal to old-slot
+        (when (= current-slot old-slot)
+          (eyebrowse--set 'current-slot new-slot))
+        ;; update last-slot if equal to old-slot
+        (when (= last-slot old-slot)
+          (eyebrowse--set 'last-slot new-slot))
+        ;; remove element from old-slot
+        (eyebrowse--delete-window-config old-slot)))))
+
+(defun eyebrowse-renumber-window-configs ()
+  "Renumber existing window configs in integer order starting at 1,
+maintaining the same relative order and tags."
+  (interactive)
+  (let* ((window-configs (eyebrowse--get 'window-configs))
+         (slots (mapcar 'car window-configs))
+         ;; NOTE: pick either the smallest slot or 1, whichever is lower
+         (slot-index (min (or (car slots) 1) 1)))
+    (dolist (slot slots)
+      (eyebrowse-move-window-config slot slot-index)
+      (setq slot-index (1+ slot-index)))))
 
 ;; NOTE I've tried out generating the respective commands dynamically
 ;; with a macro, but this ended in unreadable code and Emacs not being
