@@ -209,6 +209,17 @@ If t, ask for confirmation."
   :type 'boolean
   :group 'eyebrowse)
 
+(defcustom eyebrowse-known-tags-file
+  (expand-file-name "eyebrowse-tags.el"
+                    user-emacs-directory)
+  "Name and location of the eyebrowse tags file."
+  :type 'string
+  :group 'eyebrowse)
+
+(defvar eyebrowse-known-tags nil
+  "List of known tags.
+The list is ordered by the time of last use.")
+
 (defvar eyebrowse-mode-prefix-map
   (let ((prefix-map (make-sparse-keymap)))
     (define-key prefix-map (kbd "<") 'eyebrowse-prev-window-config)
@@ -275,6 +286,7 @@ If FRAME is nil, use current frame.  TYPE can be any of
 
 (defun eyebrowse-init (&optional frame)
   "Initialize Eyebrowse for the current frame."
+  (eyebrowse--load-known-tags)
   (unless (eyebrowse--get 'window-configs frame)
     (eyebrowse--set 'last-slot eyebrowse-default-workspace-slot frame)
     (eyebrowse--set 'current-slot eyebrowse-default-workspace-slot frame)
@@ -514,9 +526,46 @@ prefix argument to select a slot by its number."
   (let* ((window-configs (eyebrowse--get 'window-configs))
          (window-config (assoc slot window-configs))
          (current-tag (nth 2 window-config))
-         (tag (or tag (read-string "Tag: " current-tag))))
+         (tag (or tag (eyebrowse--read-tag) current-tag)))
     (setf (nth 2 window-config) tag)
     (run-hooks 'eyebrowse-indicator-change-hook)))
+
+(defun eyebrowse--read-tag ()
+  "Read in a tag to rename the current window config."
+  ;; Read in the collection of tags from the tags file.
+  (let* ((project (eyebrowse--project-name))
+         (tag
+          ;; Prompt the user for a tag.
+          (completing-read "Tag: " eyebrowse-known-tags nil nil project)))
+      ;; Save the tag in the file.
+      (eyebrowse--write-tag tag)
+      tag))
+
+(defun eyebrowse--load-known-tags ()
+    "Load known tags from `eyebrowse-known-tags-file'.
+Also set `eyebrowse-known-tags'."
+    (unless eyebrowse-known-tags
+        (setq eyebrowse-known-tags (with-temp-buffer
+                                      (insert-file-contents eyebrowse-known-tags-file)
+                                      (read (current-buffer))))))
+
+(defun eyebrowse--write-tag (tag)
+    "Write TAG to the tags file."
+    (push tag eyebrowse-known-tags)
+    (delete-dups eyebrowse-known-tags)
+    (eyebrowse--merge-known-tags))
+
+(defun eyebrowse--merge-known-tags ()
+    "Merge the known tags with the tags file."
+    (with-temp-file eyebrowse-known-tags-file
+        (prin1 eyebrowse-known-tags (current-buffer))))
+
+(defun eyebrowse--project-name ()
+  "Return the project name of the current buffer."
+  (let ((project-name (projectile-project-name)))
+    (if (string-equal project-name "-")
+        (file-name-nondirectory (directory-file-name default-directory))
+      project-name)))
 
 (defun eyebrowse-move-window-config (old-slot new-slot &optional overwrite-existing)
   "Move a window config from OLD-SLOT to NEW-SLOT.
