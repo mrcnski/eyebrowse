@@ -216,9 +216,7 @@ If t, ask for confirmation."
   :type 'string
   :group 'eyebrowse)
 
-(defvar eyebrowse-known-tags nil
-  "List of known tags.
-The list is ordered by the time of last use.")
+(defvar eyebrowse-known-tags-history nil)
 
 (defvar eyebrowse-mode-prefix-map
   (let ((prefix-map (make-sparse-keymap)))
@@ -286,7 +284,6 @@ If FRAME is nil, use current frame.  TYPE can be any of
 
 (defun eyebrowse-init (&optional frame)
   "Initialize Eyebrowse for the current frame."
-  (eyebrowse--load-known-tags)
   (unless (eyebrowse--get 'window-configs frame)
     (eyebrowse--set 'last-slot eyebrowse-default-workspace-slot frame)
     (eyebrowse--set 'current-slot eyebrowse-default-workspace-slot frame)
@@ -533,32 +530,29 @@ prefix argument to select a slot by its number."
 (defun eyebrowse--read-tag ()
   "Read in a tag to rename the current window config."
   ;; Read in the collection of tags from the tags file.
-  (let* ((project (eyebrowse--project-name))
+  (let* ((known-tags (eyebrowse--load-known-tags))
+         (project (eyebrowse--project-name))
          (tag
           ;; Prompt the user for a tag.
-          (completing-read "Tag: " eyebrowse-known-tags nil nil project)))
+          (completing-read
+           "Tag: " known-tags nil nil project eyebrowse-known-tags-history project)))
       ;; Save the tag in the file.
-      (eyebrowse--write-tag tag)
+      (eyebrowse--write-tag tag known-tags)
       tag))
 
 (defun eyebrowse--load-known-tags ()
-    "Load known tags from `eyebrowse-known-tags-file'.
-Also set `eyebrowse-known-tags'."
-    (unless eyebrowse-known-tags
-        (setq eyebrowse-known-tags (with-temp-buffer
-                                      (insert-file-contents eyebrowse-known-tags-file)
-                                      (read (current-buffer))))))
+  "Load known tags from `eyebrowse-known-tags-file'."
+  (when (file-exists-p eyebrowse-known-tags-file)
+    (with-temp-buffer
+      (insert-file-contents eyebrowse-known-tags-file)
+      (read (current-buffer)))))
 
-(defun eyebrowse--write-tag (tag)
-    "Write TAG to the tags file."
-    (push tag eyebrowse-known-tags)
-    (delete-dups eyebrowse-known-tags)
-    (eyebrowse--merge-known-tags))
-
-(defun eyebrowse--merge-known-tags ()
-    "Merge the known tags with the tags file."
+(defun eyebrowse--write-tag (new-tag known-tags)
+    "Add NEW-TAG to KNOWN-TAGS and update the tags file."
+    (push new-tag known-tags)
+    (delete-dups known-tags)
     (with-temp-file eyebrowse-known-tags-file
-        (prin1 eyebrowse-known-tags (current-buffer))))
+        (prin1 known-tags (current-buffer))))
 
 (defun eyebrowse--project-name ()
   "Return the project name of the current buffer."
