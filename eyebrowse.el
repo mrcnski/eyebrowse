@@ -535,7 +535,7 @@ prefix argument to select a slot by its number."
          (tag
           ;; Prompt the user for a tag.
           (completing-read
-           "Tag: " known-tags nil nil project eyebrowse-known-tags-history project)))
+           "Tag: " known-tags nil nil project 'eyebrowse-known-tags-history project)))
       ;; Save the tag in the file.
       (eyebrowse--write-tag tag known-tags)
       tag))
