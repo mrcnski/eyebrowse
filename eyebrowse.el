@@ -218,6 +218,25 @@ If t, ask for confirmation."
 
 (defvar eyebrowse-known-tags-history nil)
 
+(defcustom eyebrowse-save-file
+  (expand-file-name "eyebrowse-configs.el"
+                    user-emacs-directory)
+  "Name and location of the file persisting window configs.
+Used when `eyebrowse-persist-window-configs' is non-nil."
+  :type 'string
+  :group 'eyebrowse)
+
+(defcustom eyebrowse-persist-window-configs nil
+  "Whether to persist window configs across Emacs sessions.
+When non-nil, `eyebrowse-mode' saves the current frame's window
+configs to `eyebrowse-save-file' on exit and restores them on
+startup.  Because window configs reference buffers by name,
+buffers that no longer exist are replaced with the scratch
+buffer; pair this with `desktop-save-mode' to have the buffers
+themselves restored as well."
+  :type 'boolean
+  :group 'eyebrowse)
+
 (defvar eyebrowse-mode-prefix-map
   (let ((prefix-map (make-sparse-keymap)))
     (define-key prefix-map (kbd "<") 'eyebrowse-prev-window-config)
@@ -554,6 +573,40 @@ prefix argument to select a slot by its number."
     (with-temp-file eyebrowse-known-tags-file
         (prin1 known-tags (current-buffer))))
 
+(defun eyebrowse--save-window-configs ()
+  "Persist the current frame's window configs to `eyebrowse-save-file'.
+The configs are window *states* (see `eyebrowse--current-window-config'),
+which are serializable, so they can be read back in a later session."
+  (when (eyebrowse--get 'window-configs)
+    (with-temp-file eyebrowse-save-file
+      (let ((print-level nil)
+            (print-length nil))
+        (prin1 (list (eyebrowse--get 'window-configs)
+                     (eyebrowse--get 'current-slot)
+                     (eyebrowse--get 'last-slot))
+               (current-buffer))))))
+
+(defun eyebrowse--restore-window-configs ()
+  "Restore window configs persisted in `eyebrowse-save-file'.
+Restores into the current frame, replacing its window configs.
+Buffers that no longer exist are handled on display by
+`eyebrowse--fixup-window-config'."
+  (when (file-readable-p eyebrowse-save-file)
+    (with-temp-buffer
+      (insert-file-contents eyebrowse-save-file)
+      (pcase-let ((`(,configs ,current ,last) (read (current-buffer))))
+        (when configs
+          (eyebrowse--set 'window-configs configs)
+          (eyebrowse--set 'current-slot current)
+          (eyebrowse--set 'last-slot last)
+          (eyebrowse--load-window-config current)
+          ;; The `eyebrowse--set' calls above fire the indicator-change
+          ;; hook mid-restore (before `current-slot' and the window state
+          ;; are final), so fire it once more now that everything is in
+          ;; place.  This lets consumers such as the mode line or a frame
+          ;; title refresh against the fully restored state on startup.
+          (run-hooks 'eyebrowse-indicator-change-hook))))))
+
 (defun eyebrowse--project-name ()
   "Return the project name of the current buffer."
   (let ((project-name (projectile-project-name)))
@@ -819,10 +872,20 @@ behaviour of `ranger`, a file manager."
         ;; emacs and emacsclient
         (eyebrowse-init)
         (add-hook 'after-make-frame-functions 'eyebrowse-init)
+        (when eyebrowse-persist-window-configs
+          (add-hook 'kill-emacs-hook 'eyebrowse--save-window-configs)
+          ;; During startup, defer restoring until after `desktop-read'
+          ;; (which runs on `after-init-hook') has reopened the buffers
+          ;; the window configs refer to.  Once started, restore now.
+          (if after-init-time
+              (eyebrowse--restore-window-configs)
+            (add-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs 90)))
         (unless (assoc 'eyebrowse-mode mode-line-misc-info)
           (push '(eyebrowse-mode (:eval (eyebrowse-mode-line-indicator)))
                 (cdr (last mode-line-misc-info)))))
-    (remove-hook 'after-make-frame-functions 'eyebrowse-init)))
+    (remove-hook 'after-make-frame-functions 'eyebrowse-init)
+    (remove-hook 'kill-emacs-hook 'eyebrowse--save-window-configs)
+    (remove-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs)))
 
 (provide 'eyebrowse)
 ;;; eyebrowse.el ends here
