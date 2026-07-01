@@ -393,7 +393,14 @@ If a buffer name equal to OLD is found, it is replaced with NEW."
     ;; KLUDGE: workaround for visual-fill-column foolishly
     ;; setting the split-window parameter
     (let ((ignore-window-parameters t)
-          (window-config (cadr match)))
+          ;; Fix up (and display) a *copy* rather than the stored config.
+          ;; `eyebrowse--fixup-window-config' destructively rewrites any
+          ;; buffer that isn't live to "*scratch*"; run against the stored
+          ;; config it would permanently discard the real buffer name every
+          ;; time a slot is loaded before its buffers have been restored
+          ;; (e.g. by `desktop-read' on startup).  Copying keeps the stored
+          ;; config intact so the layout survives such a transient miss.
+          (window-config (copy-tree (cadr match))))
       (eyebrowse--fixup-window-config window-config)
       (window-state-put window-config (frame-root-window) 'safe))))
 
