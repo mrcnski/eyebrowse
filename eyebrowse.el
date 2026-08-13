@@ -115,6 +115,16 @@ t, 'always: Always show."
                  (const :tag "Current" current))
   :group 'eyebrowse)
 
+(defcustom eyebrowse-mode-line-repeated-tag-marker "'"
+  "Marker displayed in place of a tag repeating the previous one.
+When non-nil, a window config whose tag equals the previous config's tag
+is displayed in the indicator with this string instead of the tag.  The
+second repeat shows two markers (and so on).  Set to nil to always
+display full tags."
+  :type '(choice (const :tag "Always show full tags" nil)
+                 (string :tag "Marker"))
+  :group 'eyebrowse)
+
 (defcustom eyebrowse-wrap-around nil
   "Wrap around when switching to the next/previous window config?
 If t, wrap around."
@@ -257,6 +267,7 @@ themselves restored as well."
     (define-key prefix-map (kbd "9") 'eyebrowse-switch-to-window-config-9)
     (define-key prefix-map (kbd "c") 'eyebrowse-create-window-config)
     (define-key prefix-map (kbd "C-c") 'eyebrowse-create-window-config)
+    (define-key prefix-map (kbd "C") 'eyebrowse-clone-window-config)
     prefix-map)
   "Initial prefix key map for `eyebrowse-mode'."
   )
@@ -762,6 +773,49 @@ created named."
    (eyebrowse--get 'current-slot)
    (read-string "Tag: ")))
 
+(defun eyebrowse--vacate-slot (slot)
+  "Free up SLOT by shifting window configs up by one slot.
+Only the contiguous run of occupied slots starting at SLOT is shifted."
+  (when (eyebrowse--window-config-present-p slot)
+    (let ((window-configs (eyebrowse--get 'window-configs))
+          (run nil))
+      (while (assq slot window-configs)
+        (push slot run)
+        (setq slot (1+ slot)))
+      (eyebrowse--set 'window-configs
+        (--map (if (memq (car it) run)
+                   (cons (1+ (car it)) (cdr it))
+                 it)
+               window-configs))
+      ;; Adjust `current-slot'and `last-slot' along with the configs they refer
+      ;; to.
+      (dolist (type '(current-slot last-slot))
+        (when (memq (eyebrowse--get type) run)
+          (eyebrowse--set type (1+ (eyebrowse--get type))))))))
+
+(defun eyebrowse-clone-window-config (&optional arg)
+  "Clone the current window config into the slot right after it.
+The clone inherits the current config's tag, and any window
+configs in the way are shifted up by one slot to make room.
+Switch to the clone, unless prefix ARG is non-nil, in which case
+stay on the original."
+  (interactive "P")
+  (let* ((slot (eyebrowse--get 'current-slot))
+         (tag (nth 2 (assq slot (eyebrowse--get 'window-configs))))
+         (clone-slot (1+ slot)))
+    ;; Capture the live state into the original before copying it, so
+    ;; both entries reflect the moment of cloning.
+    (eyebrowse--update-window-config-element
+     (eyebrowse--current-window-config slot tag))
+    (eyebrowse--vacate-slot clone-slot)
+    (eyebrowse--insert-in-window-config-list
+     (eyebrowse--current-window-config clone-slot tag))
+    (unless arg
+      ;; The clone's state is already the live state, so switching to
+      ;; it is pure bookkeeping; no window config has to be loaded.
+      (eyebrowse--set 'last-slot slot)
+      (eyebrowse--set 'current-slot clone-slot))))
+
 (defvar evil-motion-state-map)
 
 ;;;###autoload
@@ -799,10 +853,11 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
     (define-key map (kbd "M-8") 'eyebrowse-switch-to-window-config-8)
     (define-key map (kbd "M-9") 'eyebrowse-switch-to-window-config-9)))
 
-(defun eyebrowse-format-slot (window-config is-current)
-  "Format the slot at WINDOW-CONFIG, taking into account if IS-CURRENT."
+(defun eyebrowse-format-slot (window-config is-current &optional display-tag)
+  "Format the slot at WINDOW-CONFIG, taking into account if IS-CURRENT.
+If DISPLAY-TAG is non-nil, show it in place of the config's tag."
   (let* ((slot (car window-config))
-         (tag (nth 2 window-config))
+         (tag (or display-tag (nth 2 window-config)))
          (format-string (if (and tag (> (length tag) 0))
                             eyebrowse-tagged-slot-format
                           eyebrowse-slot-format))
@@ -840,27 +895,47 @@ will be set up with `eyebrowse-setup-evil-keys' as well."
                       (> (length window-configs) 1))))
         (concat
          left-delimiter
-         (mapconcat
-          (lambda (window-config)
-            (let* ((slot (car window-config))
-                   (is-current (= slot current-slot))
-                   (face (if is-current
-                             'eyebrowse-mode-line-active
-                           'eyebrowse-mode-line-inactive))
-                   (keymap
-                    (let ((map (make-sparse-keymap)))
-                      (define-key map (kbd "<mode-line><mouse-1>")
-                        (lambda (_e)
-                          (interactive "e")
-                          (eyebrowse-switch-to-window-config slot)))
-                      map))
-                   (help-echo "mouse-1: Switch to indicated workspace")
-                   (caption (eyebrowse-format-slot window-config is-current)))
-              (propertize caption 'face face 'slot slot
-                          'mouse-face 'mode-line-highlight
-                          'local-map keymap
-                          'help-echo help-echo)))
-          window-configs separator)
+         (let ((prev-tag nil)
+               (repeats 0))
+           (mapconcat
+            (lambda (window-config)
+              (let* ((slot (car window-config))
+                     (tag (nth 2 window-config))
+                     ;; A tag repeating the previous config's tag (clones
+                     ;; inherit it verbatim) may result inrepeat markers shown
+                     ;; instead.
+                     (display-tag
+                      (if (and eyebrowse-mode-line-repeated-tag-marker
+                               tag (> (length tag) 0)
+                               (equal tag prev-tag))
+                          (progn
+                            (setq repeats (1+ repeats))
+                            (apply #'concat
+                                   (make-list
+                                    repeats
+                                    eyebrowse-mode-line-repeated-tag-marker)))
+                        (setq repeats 0)
+                        nil))
+                     (is-current (= slot current-slot))
+                     (face (if is-current
+                               'eyebrowse-mode-line-active
+                             'eyebrowse-mode-line-inactive))
+                     (keymap
+                      (let ((map (make-sparse-keymap)))
+                        (define-key map (kbd "<mode-line><mouse-1>")
+                          (lambda (_e)
+                            (interactive "e")
+                            (eyebrowse-switch-to-window-config slot)))
+                        map))
+                     (help-echo "mouse-1: Switch to indicated workspace")
+                     (caption (eyebrowse-format-slot
+                               window-config is-current display-tag)))
+                (setq prev-tag tag)
+                (propertize caption 'face face 'slot slot
+                            'mouse-face 'mode-line-highlight
+                            'local-map keymap
+                            'help-echo help-echo)))
+            window-configs separator))
          right-delimiter)
       "")))
 
