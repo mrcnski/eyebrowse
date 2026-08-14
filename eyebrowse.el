@@ -242,7 +242,7 @@ When non-nil, `eyebrowse-mode' saves the current frame's window
 configs to `eyebrowse-save-file' on exit and restores them on
 startup.  Because window configs reference buffers by name,
 buffers that no longer exist are replaced with the scratch
-buffer; pair this with `desktop-save-mode' to have the buffers
+buffer. Pair this with `desktop-save-mode' to have the buffers
 themselves restored as well."
   :type 'boolean
   :group 'eyebrowse)
@@ -688,6 +688,8 @@ maintaining the same relative order and tags."
 ;; loop resulted in very fun looking key bindings with closures in the
 ;; command description.  That's why I gave up and just wrote out the
 ;; first ten commands instead.
+;;
+;; NOTE(mrcnski): I expanded beyond ten commands haha!
 
 (defun eyebrowse-switch-to-window-config-0 ()
   "Switch to window configuration 0."
@@ -738,6 +740,56 @@ maintaining the same relative order and tags."
   "Switch to window configuration 9."
   (interactive)
   (eyebrowse-switch-to-window-config 9))
+
+(defun eyebrowse-switch-to-window-config-10 ()
+  "Switch to window configuration 10."
+  (interactive)
+  (eyebrowse-switch-to-window-config 10))
+
+(defun eyebrowse-switch-to-window-config-11 ()
+  "Switch to window configuration 11."
+  (interactive)
+  (eyebrowse-switch-to-window-config 11))
+
+(defun eyebrowse-switch-to-window-config-12 ()
+  "Switch to window configuration 12."
+  (interactive)
+  (eyebrowse-switch-to-window-config 12))
+
+(defun eyebrowse-switch-to-window-config-13 ()
+  "Switch to window configuration 13."
+  (interactive)
+  (eyebrowse-switch-to-window-config 13))
+
+(defun eyebrowse-switch-to-window-config-14 ()
+  "Switch to window configuration 14."
+  (interactive)
+  (eyebrowse-switch-to-window-config 14))
+
+(defun eyebrowse-switch-to-window-config-15 ()
+  "Switch to window configuration 15."
+  (interactive)
+  (eyebrowse-switch-to-window-config 15))
+
+(defun eyebrowse-switch-to-window-config-16 ()
+  "Switch to window configuration 16."
+  (interactive)
+  (eyebrowse-switch-to-window-config 16))
+
+(defun eyebrowse-switch-to-window-config-17 ()
+  "Switch to window configuration 17."
+  (interactive)
+  (eyebrowse-switch-to-window-config 17))
+
+(defun eyebrowse-switch-to-window-config-18 ()
+  "Switch to window configuration 18."
+  (interactive)
+  (eyebrowse-switch-to-window-config 18))
+
+(defun eyebrowse-switch-to-window-config-19 ()
+  "Switch to window configuration 19."
+  (interactive)
+  (eyebrowse-switch-to-window-config 19))
 
 (defun eyebrowse-free-slot (slots)
   "Returns a yet unoccupied slot.
