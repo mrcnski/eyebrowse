@@ -670,6 +670,55 @@ prompt shown if none is given."
         ;; remove element from old-slot
         (eyebrowse--delete-window-config old-slot)))))
 
+(defun eyebrowse-swap-window-configs (slot-a slot-b)
+  "Swap the window configs stored in SLOT-A and SLOT-B.
+Both slots must be occupied.  If the current window config is in
+either slot, `current-slot' follows it to its new slot number."
+  (unless (= slot-a slot-b)
+    (unless (eyebrowse--window-config-present-p slot-a)
+      (user-error "No window configuration in slot %d" slot-a))
+    (unless (eyebrowse--window-config-present-p slot-b)
+      (user-error "No window configuration in slot %d" slot-b))
+    ;; `eyebrowse-move-window-config' only ever writes to a single
+    ;; free slot at a time, so route the swap through a scratch slot
+    ;; rather than juggling both moves at once.
+    (let ((temp-slot (eyebrowse-free-slot
+                       (mapcar 'car (eyebrowse--get 'window-configs)))))
+      (eyebrowse-move-window-config slot-a temp-slot)
+      (eyebrowse-move-window-config slot-b slot-a)
+      (eyebrowse-move-window-config temp-slot slot-b))))
+
+(defun eyebrowse--drag-window-config (direction)
+  "Swap the current window config with its DIRECTION neighbor.
+DIRECTION is 1 to swap with the next window config or -1 to swap
+with the previous one, in the order they are displayed in the
+mode line.  Honors `eyebrowse-wrap-around'."
+  (let* ((window-configs (eyebrowse--get 'window-configs))
+         (index (-elem-index (assq (eyebrowse--get 'current-slot) window-configs)
+                              window-configs))
+         (target-index (+ index direction))
+         (count (length window-configs)))
+    (when (and eyebrowse-wrap-around (> count 1))
+      (setq target-index (mod target-index count)))
+    (if (and index (>= target-index 0) (< target-index count))
+        (eyebrowse-swap-window-configs (eyebrowse--get 'current-slot)
+                                        (car (nth target-index window-configs)))
+      (user-error "No window config to drag in that direction"))))
+
+(defun eyebrowse-drag-window-config-left ()
+  "Move the current window config one position to the left.
+This swaps places with its predecessor in the mode line, rather
+than renumbering every workspace in between."
+  (interactive)
+  (eyebrowse--drag-window-config -1))
+
+(defun eyebrowse-drag-window-config-right ()
+  "Move the current window config one position to the right.
+This swaps places with its successor in the mode line, rather
+than renumbering every workspace in between."
+  (interactive)
+  (eyebrowse--drag-window-config 1))
+
 (defun eyebrowse-renumber-window-configs ()
   "Renumber existing window configs in integer order starting at 1,
 maintaining the same relative order and tags."
