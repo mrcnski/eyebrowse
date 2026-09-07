@@ -7,7 +7,7 @@
 ;; Maintainer: Marcin Swieczkowski <marcin@realemail.net>
 ;; URL: https://github.com/mrcnski/eyebrowse
 ;; Version: 0.8.0
-;; Package-Requires: ((dash "2.7.0") (emacs "24.4"))
+;; Package-Requires: ((dash "2.7.0") (emacs "27.1"))
 ;; Keywords: convenience
 
 ;; This file is NOT part of GNU Emacs.
@@ -525,7 +525,8 @@ switch COUNT window configs backwards and always wrap around."
   "Remove the window config at SLOT."
   (let ((window-configs (eyebrowse--get 'window-configs)))
     (eyebrowse--set 'window-configs
-      (remove (assq slot window-configs) window-configs))))
+      (remove (assq slot window-configs) window-configs))
+    (eyebrowse--winner-drop-slot slot)))
 
 (defun eyebrowse-close-window-config ()
   "Close the current window config.
@@ -625,6 +626,101 @@ Buffers that no longer exist are handled on display by
           ;; title refresh against the fully restored state on startup.
           (run-hooks 'eyebrowse-indicator-change-hook))))))
 
+;;; Winner integration
+;;
+;; Modeled on `tab-bar-history-mode', which stashes the frame's history
+;; stacks into the tab being left and reinstalls the target tab's stacks on
+;; every switch.
+
+(defcustom eyebrowse-winner-integration t
+  "Whether to keep a separate `winner-mode' history per window config.
+When non-nil and `winner-mode' is on, every window config gets its own
+undo ring."
+  :type 'boolean
+  :group 'eyebrowse)
+
+;; Winner internals that this integration relies on: `winner-ring-alist' holds
+;; each frame's undo ring, `winner-modified-list' the frames whose changes the
+;; next `post-command-hook' run will record, and `winner-remember' snapshots the
+;; "current" configuration, which is what the next recording pushes onto the
+;; ring.
+(defvar winner-ring-alist)
+(defvar winner-modified-list)
+(declare-function winner-remember "winner")
+(declare-function ring-copy "ring")
+
+(defvar eyebrowse--winner-rings nil
+  "Winner histories of the window configs not currently displayed.
+Alist of (FRAME . ((SLOT . RING) ...)).  The current slot's ring lives
+in `winner-ring-alist' while it is displayed and is only stashed here on
+switching away, so a stashed entry for the current slot aliases the live
+ring.")
+
+(defun eyebrowse--winner-active-p ()
+  "Non-nil if per-window-config winner histories should be maintained."
+  (and eyebrowse-winner-integration (bound-and-true-p winner-mode)))
+
+(defun eyebrowse--winner-stash ()
+  "Stash the frame's live winner ring under the current slot.
+Runs on `eyebrowse-pre-window-switch-hook', while the window
+config being switched away from is still current."
+  (when (eyebrowse--winner-active-p)
+    (let* ((frame (selected-frame))
+           (live (assq frame winner-ring-alist)))
+      (when live
+        (setf (alist-get (eyebrowse--get 'current-slot frame)
+                         (alist-get frame eyebrowse--winner-rings))
+              (cdr live))))))
+
+(defun eyebrowse--winner-restore ()
+  "Install the stashed winner ring of the new current slot, if any.
+Runs on `eyebrowse-post-window-switch-hook'."
+  (when (eyebrowse--winner-active-p)
+    (let* ((frame (selected-frame))
+           (frame-rings (alist-get frame eyebrowse--winner-rings))
+           (ring (alist-get (eyebrowse--get 'current-slot frame) frame-rings)))
+      ;; The switch just rearranged windows, so winner flagged this frame as
+      ;; "something changed here, save it to undo history".  But the switch
+      ;; shouldn't be undoable (undo would drag you back to the old workspace's
+      ;; layout) so take the frame off that list.  Then tell winner "this is
+      ;; what the screen looks like now", so its next real save starts from the
+      ;; new workspace, not the old one.
+      (setq winner-modified-list (delq frame winner-modified-list))
+      (winner-remember)
+      (if ring
+          (setf (alist-get frame winner-ring-alist) ring)
+        ;; This workspace has no undo history yet, but the old workspace's ring
+        ;; is still installed. Leaving it there would hand its history to this
+        ;; workspace, so drop it. winner creates a fresh empty ring by itself
+        ;; the next time it needs one.
+        (setq winner-ring-alist (assq-delete-all frame winner-ring-alist))))))
+
+(add-hook 'eyebrowse-pre-window-switch-hook #'eyebrowse--winner-stash)
+(add-hook 'eyebrowse-post-window-switch-hook #'eyebrowse--winner-restore)
+
+(defun eyebrowse--winner-drop-slot (slot &optional frame)
+  "Discard any stashed winner ring of SLOT."
+  (let ((cell (assq (or frame (selected-frame)) eyebrowse--winner-rings)))
+    (when cell
+      (setcdr cell (assq-delete-all slot (cdr cell))))))
+
+(defun eyebrowse--winner-remap-slot (old-slot new-slot &optional frame)
+  "Rekey the stashed winner ring of OLD-SLOT to NEW-SLOT.
+Any ring stashed for NEW-SLOT is discarded."
+  (let ((cell (assq (or frame (selected-frame)) eyebrowse--winner-rings)))
+    (when cell
+      (setcdr cell (assq-delete-all new-slot (cdr cell)))
+      (let ((entry (assq old-slot (cdr cell))))
+        (when entry
+          (setcar entry new-slot))))))
+
+(defun eyebrowse--winner-forget-frame (frame)
+  "Drop the stashed winner rings of FRAME."
+  (setq eyebrowse--winner-rings
+        (assq-delete-all frame eyebrowse--winner-rings)))
+
+(add-hook 'delete-frame-functions #'eyebrowse--winner-forget-frame)
+
 (defun eyebrowse--project-name ()
   "Return the project name of the current buffer."
   (let ((project-name (projectile-project-name)))
@@ -667,6 +763,9 @@ prompt shown if none is given."
         ;; update last-slot if equal to old-slot
         (when (= last-slot old-slot)
           (eyebrowse--set 'last-slot new-slot))
+        ;; move any per-slot winner history along, before the deletion below
+        ;; would drop it
+        (eyebrowse--winner-remap-slot old-slot new-slot)
         ;; remove element from old-slot
         (eyebrowse--delete-window-config old-slot)))))
 
@@ -892,7 +991,12 @@ Only the contiguous run of occupied slots starting at SLOT is shifted."
       ;; to.
       (dolist (type '(current-slot last-slot))
         (when (memq (eyebrowse--get type) run)
-          (eyebrowse--set type (1+ (eyebrowse--get type))))))))
+          (eyebrowse--set type (1+ (eyebrowse--get type)))))
+      ;; Shift any per-slot winner histories along with their configs.
+      (let ((cell (assq (selected-frame) eyebrowse--winner-rings)))
+        (dolist (entry (cdr cell))
+          (when (memq (car entry) run)
+            (setcar entry (1+ (car entry)))))))))
 
 (defun eyebrowse-clone-window-config (&optional arg)
   "Clone the current window config into the slot right after it.
@@ -911,6 +1015,13 @@ stay on the original."
     (eyebrowse--vacate-slot clone-slot)
     (eyebrowse--insert-in-window-config-list
      (eyebrowse--current-window-config clone-slot tag))
+    ;; The clone inherits the winner history and the histories diverge from now.
+    (when (eyebrowse--winner-active-p)
+      (let ((live (cdr (assq (selected-frame) winner-ring-alist))))
+        (when live
+          (setf (alist-get (if arg clone-slot slot)
+                           (alist-get (selected-frame) eyebrowse--winner-rings))
+                (ring-copy live)))))
     (unless arg
       ;; The clone's state is already the live state, so switching to
       ;; it is pure bookkeeping; no window config has to be loaded.
