@@ -6,7 +6,7 @@
 ;;    Marcin Swieczkowski <marcin@realemail.net>
 ;; Maintainer: Marcin Swieczkowski <marcin@realemail.net>
 ;; URL: https://github.com/mrcnski/eyebrowse
-;; Version: 0.8.0
+;; Version: 0.9.0
 ;; Package-Requires: ((dash "2.7.0") (emacs "27.1"))
 ;; Keywords: convenience
 
