@@ -63,55 +63,45 @@ will undo this change.
 
 ## Key bindings
 
-The default key bindings are:
+The default keymap prefix is `C-c C-w`, but I (the fork author) strongly
+recommend setting more ergonomic bindings (e.g. `s-1`, `s-2`, ... to switch
+workspaces):
 
-| Key bind  | Function                         |
-|-----------+----------------------------------|
-| C-c C-w < | Switch to previous window config |
-| C-c C-w > | Switch to next window config     |
-| C-c C-w ' | Switch to last window config     |
-| C-c C-w " | Close current window config      |
-| C-c C-w , | Rename current window config     |
-| C-c C-w 0 | Switch to window config 0        |
-| ...       | ...                              |
-| C-c C-w 9 | Switch to window config 9        |
+```elisp
+(use-package eyebrowse
+  :load-path "~/.emacs.d/packages/eyebrowse"
+  :bind (
+         ("s-," . eyebrowse-prev-window-config)
+         ("s-." . eyebrowse-next-window-config)
+         ("s-<" . eyebrowse-drag-window-config-left)
+         ("s->" . eyebrowse-drag-window-config-right)
+         ("s-0" . eyebrowse-switch-to-window-config-0)
+         ("s-1" . eyebrowse-switch-to-window-config-1)
+         ("s-2" . eyebrowse-switch-to-window-config-2)
+         ("s-3" . eyebrowse-switch-to-window-config-3)
+         ("s-4" . eyebrowse-switch-to-window-config-4)
+         ("s-5" . eyebrowse-switch-to-window-config-5)
+         ("s-6" . eyebrowse-switch-to-window-config-6)
+         ("s-7" . eyebrowse-switch-to-window-config-7)
+         ("s-8" . eyebrowse-switch-to-window-config-8)
+         ("s-9" . eyebrowse-switch-to-window-config-9)
+         ("s-C-0" . eyebrowse-switch-to-window-config-10)
+         ("s-C-1" . eyebrowse-switch-to-window-config-11)
+         ("s-C-2" . eyebrowse-switch-to-window-config-12)
+         ("s-C-3" . eyebrowse-switch-to-window-config-13)
+         ("s-C-4" . eyebrowse-switch-to-window-config-14)
+         ("s-C-5" . eyebrowse-switch-to-window-config-15)
+         ("s-C-6" . eyebrowse-switch-to-window-config-16)
+         ("s-C-7" . eyebrowse-switch-to-window-config-17)
+         ("s-C-8" . eyebrowse-switch-to-window-config-18)
+         ("s-C-9" . eyebrowse-switch-to-window-config-19)
+         ("s-=" . eyebrowse-close-window-config)
+         ("s--" . eyebrowse-rename-window-config)
+         ("s-+" . eyebrowse-clone-window-config)
+         )
 
-## Further Customization
-
-Use `M-x customize-group RET eyebrowse` for a list of customizable
-options.  The more interesting ones would be `eyebrowse-wrap-around`
-and `eyebrowse-switch-back-and-forth` which affect both wrap around
-and lazier switching.  It is also possible to change the behaviour of
-creation of new workspaces by customizing `eyebrowse-new-workspace`.
-By default the last one is simply cloned, setting it to `t` will start
-out with as empty of a slate as possible (by just displaying a single
-window with the scratch buffer in it).
-
-The prefix for each binding defaults to `C-c C-w`, but you can change
-it to something else by customizing `eyebrowse-keymap-prefix`.  If you
-want to change it in your init file, insert the customization before
-loading `eyebrowse.el`.  This includes enabling it with an auto-loaded
-function, such as `eyebrowse-setup-evil-keys`,
-`eyebrowse-setup-opinionated-keys` or `eyebrowse-mode`.
-
-If you're not happy with the default keybindings, a riskier set can be
-enabled additionally either by executing `M-:
-(eyebrowse-setup-opinionated-keys)` interactively or inserting
-`(eyebrowse-setup-opinionated-keys)` in your init file.  If the
-function detects the [evil] package, it will enable extra key bindings
-for it as well.
-
-The extra key bindings are:
-
-| Key bind | Function                         |
-|----------+----------------------------------|
-| C-<, gT  | Switch to previous window config |
-| C->, gt  | Switch to next window config     |
-| C-', zx  | Switch to last window config     |
-| C-", gc  | Close current window config      |
-| M-0      | Switch to window config 0        |
-| ...      | ...                              |
-| M-9      | Switch to window config 9        |
+  ;; ...
+```
 
 ## Internals
 
