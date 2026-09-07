@@ -759,6 +759,8 @@ prompt shown if none is given."
         (user-error "No window configuration in slot %d" old-slot))
       (when (and new-slot-exists (not overwrite-existing))
         (user-error "Window configuration already exists in slot %d" new-slot))
+      (when (= new-slot (eyebrowse--get 'current-slot))
+        (user-error "Cannot overwrite the currently displayed window configuration"))
       (let* ((current-slot (eyebrowse--get 'current-slot))
              (last-slot (eyebrowse--get 'last-slot))
              (window-configs (eyebrowse--get 'window-configs))

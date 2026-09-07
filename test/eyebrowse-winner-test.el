@@ -167,6 +167,42 @@
      (should (eq (eyebrowse-winner-test--stash 2) ring1))
      (should (eq (eyebrowse-winner-test--stash 1) ring2)))))
 
+(ert-deftest eyebrowse-winner-overwrite-move-onto-current-slot-errors ()
+  "Overwriting the displayed slot is refused and leaves rings untouched."
+  (eyebrowse-winner-test--fixture
+   ;; Build history in slot 1 (displayed) and slot 3.
+   (split-window) (eyebrowse-winner-test--record)
+   (eyebrowse-switch-to-window-config 3)
+   (split-window) (eyebrowse-winner-test--record)
+   (eyebrowse-switch-to-window-config 1)
+   (let ((ring1 (eyebrowse-winner-test--live-ring))
+         (ring3 (eyebrowse-winner-test--stash 3)))
+     (should-error (eyebrowse-move-window-config 3 1 t) :type 'user-error)
+     ;; Nothing moved, nothing corrupted.
+     (should (eyebrowse--window-config-present-p 3))
+     (should (eq (eyebrowse-winner-test--live-ring) ring1))
+     (should (eq (eyebrowse-winner-test--stash 3) ring3)))))
+
+(ert-deftest eyebrowse-winner-overwrite-move-remaps-ring ()
+  "Overwriting another slot hands it the moved config's ring."
+  (eyebrowse-winner-test--fixture
+   ;; Build history in slots 3 and 5, then return to slot 1.
+   (eyebrowse-switch-to-window-config 3)
+   (split-window) (eyebrowse-winner-test--record)
+   (eyebrowse-switch-to-window-config 5)
+   (split-window) (eyebrowse-winner-test--record)
+   (eyebrowse-switch-to-window-config 1)
+   (let ((ring3 (eyebrowse-winner-test--stash 3))
+         (ring5 (eyebrowse-winner-test--stash 5)))
+     (should (and ring3 ring5))
+     (eyebrowse-move-window-config 3 5 t)
+     ;; Slot 5 now holds slot 3's config and history; the overwritten
+     ;; config's ring is gone.
+     (should (eq (eyebrowse-winner-test--stash 5) ring3))
+     (should-not (eyebrowse-winner-test--stash 3))
+     (should-not (rassq ring5 (alist-get (selected-frame)
+                                         eyebrowse--winner-rings))))))
+
 (ert-deftest eyebrowse-winner-delete-drops-ring ()
   "Deleting a workspace discards its stashed ring."
   (eyebrowse-winner-test--fixture
