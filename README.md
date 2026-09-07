@@ -8,6 +8,20 @@ managers like i3wm with their workspaces do.  It displays their
 current state in the modeline by default.  The behaviour is modeled
 after [ranger], a file manager written in Python.
 
+## This fork
+
+This fork continues development past the last [upstream] release
+(0.7.8).  The significant additions:
+
+- **Support for naming (tagging) workspaces**
+- **Per-workspace winner histories**
+- **Persistence across restarts**
+- **Cloning, dragging and swapping**
+- ... and more!
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.  The fork
+requires Emacs 27.1 or later.
+
 ## Screenshot
 
 ![][screenshot]
@@ -17,9 +31,14 @@ bottom modeline?  That's what you get to see after enabling eyebrowse.
 
 ## Installation
 
-Install via `package.el` from the [MELPA (stable)] repository by
-setting them up if you haven't already and executing `M-x
-package-install RET eyebrowse RET`.
+This fork is not on MELPA.  Clone the repository and load it from
+your init file:
+
+    (use-package eyebrowse
+      :load-path "path/to/eyebrowse"
+      :config (eyebrowse-mode t))
+
+(Upstream eyebrowse is still available from [MELPA (stable)].)
 
 ## Quick Tutorial
 
@@ -113,16 +132,15 @@ as well:
     (add-to-list 'window-persistent-parameters '(window-side . writable))
     (add-to-list 'window-persistent-parameters '(window-slot . writable))
 
-See [\#52] for further discussion.
-
 ## Persistence
 
-[desktop.el] provides a built-in solution for saving and restoring
-window configurations. See [eyebrowse-restore] for an alternative
-solution to selectively restore window configurations, for example
-when using several frames.
+This fork can persist window configs across restarts on its own: set
+`eyebrowse-persist-window-configs` to a non-nil value.  Pair it with
+[desktop.el], which brings back the buffers the configs refer to.
 
 ## Alternatives
+
+**Note:** outdated!
 
 The two most popular window configuration packages are [elscreen] and
 [escreen].  Both are fairly old and have their share of bugs.  The
@@ -137,13 +155,13 @@ Actually, I wanted to name this mode "eyebrows" for no real reason,
 but then a silly typo happened.  The typo stuck.  So did the new name.
 
 [image]: img/eyebrows.gif
+[upstream]: https://depp.brause.cc/eyebrowse
 [ranger]: https://ranger.github.io/
 [screenshot]: img/scrot.png
 [MELPA (stable)]: http://melpa.org/
 [evil]: https://bitbucket.org/lyro/evil/wiki/Home
 [desktop.el]: https://www.gnu.org/software/emacs/manual/html_node/emacs/Saving-Emacs-Sessions.html#Saving-Emacs-Sessions
 [\#52]: https://github.com/wasamasa/eyebrowse/issues/52
-[eyebrowse-restore]: https://github.com/FrostyX/eyebrowse-restore
 [elscreen]: https://github.com/shosti/elscreen
 [escreen]: https://github.com/emacsattic/escreen
 [perspective]: https://github.com/nex3/perspective-el
