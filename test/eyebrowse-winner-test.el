@@ -111,6 +111,22 @@
    (eyebrowse-winner-test--undo)
    (should (= (length (window-list)) 2))))
 
+(ert-deftest eyebrowse-winner-same-command-change-is-not-lost ()
+  "A layout change made by the very command that switches is recorded."
+  (eyebrowse-winner-test--fixture
+   (split-window) (eyebrowse-winner-test--record)
+   (should (= (length (window-list)) 2))
+   ;; One command deletes a window AND switches workspace: the change is
+   ;; still pending (no post-command save has run) when the switch happens.
+   (setq this-command (gensym))
+   (delete-other-windows)
+   (winner-change-fun)
+   (eyebrowse-switch-to-window-config 2)
+   (eyebrowse-switch-to-window-config 1)
+   ;; Undo restores the two-window layout from before the delete.
+   (eyebrowse-winner-test--undo)
+   (should (= (length (window-list)) 2))))
+
 (ert-deftest eyebrowse-winner-fresh-workspace-has-no-history ()
   "Undo in a brand-new workspace finds nothing to undo."
   (eyebrowse-winner-test--fixture

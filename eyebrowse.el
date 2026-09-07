@@ -647,6 +647,7 @@ undo ring."
 (defvar winner-ring-alist)
 (defvar winner-modified-list)
 (declare-function winner-remember "winner")
+(declare-function winner-save-unconditionally "winner")
 (declare-function ring-copy "ring")
 
 (defvar eyebrowse--winner-rings nil
@@ -667,6 +668,16 @@ config being switched away from is still current."
   (when (eyebrowse--winner-active-p)
     (let* ((frame (selected-frame))
            (live (assq frame winner-ring-alist)))
+      ;; Winner saves history only when a command finishes. Until then it just
+      ;; notes "layout changed" in `winner-modified-list', and the restore hook
+      ;; deletes that note so the switch isn't undoable.  If the command that
+      ;; triggered this switch already changed the layout beforehand, that
+      ;; change shares the note and would be lost with it, so save it into this
+      ;; workspace's history now, while it's current.
+      (when (memq frame winner-modified-list)
+        (winner-save-unconditionally)
+        (setq winner-modified-list (delq frame winner-modified-list))
+        (setq live (assq frame winner-ring-alist)))
       (when live
         (setf (alist-get (eyebrowse--get 'current-slot frame)
                          (alist-get frame eyebrowse--winner-rings))
