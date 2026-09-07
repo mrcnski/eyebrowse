@@ -238,12 +238,12 @@ Used when `eyebrowse-persist-window-configs' is non-nil."
 
 (defcustom eyebrowse-persist-window-configs nil
   "Whether to persist window configs across Emacs sessions.
-When non-nil, `eyebrowse-mode' saves the current frame's window
-configs to `eyebrowse-save-file' on exit and restores them on
-startup.  Because window configs reference buffers by name,
-buffers that no longer exist are replaced with the scratch
-buffer. Pair this with `desktop-save-mode' to have the buffers
-themselves restored as well."
+When non-nil, `eyebrowse-mode' saves the current frame's window configs
+to `eyebrowse-save-file' on exit and whenever `desktop-save' runs, and
+restores them on startup.  Because window configs reference buffers by
+name, buffers that no longer exist are replaced with the scratch buffer.
+Pair this with `desktop-save-mode' to have the buffers themselves
+restored as well, and the configs saved on desktop's idle auto-save."
   :type 'boolean
   :group 'eyebrowse)
 
@@ -1181,6 +1181,10 @@ behaviour of `ranger`, a file manager."
         (add-hook 'after-make-frame-functions 'eyebrowse-init)
         (when eyebrowse-persist-window-configs
           (add-hook 'kill-emacs-hook 'eyebrowse--save-window-configs)
+          ;; Also save whenever desktop writes its file (on exit and on its
+          ;; idle auto-save), so the configs survive an unexpected quit.
+          ;; `add-hook' creates the variable if desktop isn't loaded yet.
+          (add-hook 'desktop-save-hook 'eyebrowse--save-window-configs)
           ;; During startup, defer restoring until after `desktop-read'
           ;; (which runs on `after-init-hook') has reopened the buffers
           ;; the window configs refer to.  Once started, restore now.
@@ -1192,6 +1196,7 @@ behaviour of `ranger`, a file manager."
                 (cdr (last mode-line-misc-info)))))
     (remove-hook 'after-make-frame-functions 'eyebrowse-init)
     (remove-hook 'kill-emacs-hook 'eyebrowse--save-window-configs)
+    (remove-hook 'desktop-save-hook 'eyebrowse--save-window-configs)
     (remove-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs)))
 
 (provide 'eyebrowse)
