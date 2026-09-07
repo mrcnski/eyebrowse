@@ -2,11 +2,9 @@
 
 ## About
 
-`eyebrowse` is a global minor mode for Emacs that allows you to manage
-your window configurations in a simple manner, just like tiling window
-managers like i3wm with their workspaces do.  It displays their
-current state in the modeline by default.  The behaviour is modeled
-after [ranger], a file manager written in Python.
+Manage your window configurations in a simple manner using workspaces!
+Eyebrowse displays the current state of your workspaces in the modeline by
+default.
 
 ## This fork
 
@@ -99,6 +97,11 @@ workspaces):
          ("s--" . eyebrowse-rename-window-config)
          ("s-+" . eyebrowse-clone-window-config)
          )
+
+  :init
+
+  ;; Free up keybindings unnecessarily stolen by eyebrowse.
+  (setq eyebrowse-keymap-prefix (kbd ""))
 
   ;; ...
 ```

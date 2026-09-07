@@ -4,6 +4,14 @@ All notable changes to this fork of
 [eyebrowse](https://depp.brause.cc/eyebrowse) since the last upstream release
 (0.7.8).
 
+## Unreleased
+
+### Changed
+
+- With `eyebrowse-persist-window-configs`, window configs are also saved
+  whenever `desktop-save` runs, not only on exit, so they survive an unexpected
+  quit when `desktop-save-mode` auto-saves.
+
 ## 0.9.0 (2026-09-07)
 
 ### Added
