@@ -59,6 +59,22 @@ will both appear in the modeline indicator and when using `M-x
 eyebrowse-switch-to-window-config`.  Setting the tag to an empty value
 will undo this change.
 
+## Indicator placement
+
+`eyebrowse-indicator-target` accepts `mode-line` (default), `header-line`,
+`frame-title`, or `nil` for manual placement.  For example, before enabling
+the mode:
+
+```elisp
+(setq eyebrowse-indicator-target 'frame-title
+      eyebrowse-indicator-format " — %s")
+```
+
+Use Customize or `setopt` to move it while the mode is running.
+
+For a custom title layout, set the target to `nil` and include
+`eyebrowse-indicator-string` in `frame-title-format`
+
 ## Key bindings
 
 The default keymap prefix is `C-c C-w`, but I (the fork author) strongly

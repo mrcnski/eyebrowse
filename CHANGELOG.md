@@ -6,6 +6,13 @@ All notable changes to this fork of
 
 ## Unreleased
 
+### Added
+
+- `eyebrowse-indicator-target` selects the mode line (the default), header line,
+  frame title, or manual placement (`nil`).
+- Cached plain-text `eyebrowse-indicator-string` for frame titles and manual
+  placement, with `eyebrowse-indicator-format` for padding or separators.
+
 ### Changed
 
 - With `eyebrowse-persist-window-configs`, window configs are also saved

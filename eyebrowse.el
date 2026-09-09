@@ -179,9 +179,109 @@ t: Clean up and display the scratch buffer."
   :group 'eyebrowse)
 
 (defcustom eyebrowse-indicator-change-hook nil
-  "Hook run when the visual indicator should change."
+  "Hook run when the visual indicator should change.
+`eyebrowse-indicator-string' is refreshed before normal hook functions run."
   :type 'hook
   :group 'eyebrowse)
+
+(defcustom eyebrowse-indicator-target 'mode-line
+  "Where `eyebrowse-mode' displays its indicator automatically.
+The default preserves the clickable mode line indicator.  Header lines
+also use the clickable indicator; frame titles use the cached plain-text
+`eyebrowse-indicator-string'.  With nil, place that string yourself.
+Changing this with Customize or `setopt' moves the indicator immediately.
+With `setq', the change takes effect when the mode is next enabled."
+  :type '(choice (const :tag "Nowhere (place it yourself)" nil)
+                 (const :tag "Mode line" mode-line)
+                 (const :tag "Header line" header-line)
+                 (const :tag "Frame title" frame-title))
+  :set (lambda (symbol value)
+         (set-default symbol value)
+         (when (bound-and-true-p eyebrowse-mode)
+           (eyebrowse--install-indicator)
+           (run-hooks 'eyebrowse-indicator-change-hook)))
+  :group 'eyebrowse)
+
+(defcustom eyebrowse-indicator-format "%s"
+  "Format for the cached plain-text workspace indicator.
+The string must contain a single %s placeholder.  Only nonempty
+indicators are formatted, so separators disappear when it is hidden."
+  :type 'string
+  :group 'eyebrowse)
+
+(defvar eyebrowse-indicator-string ""
+  "Cached plain-text indicator for the selected frame.
+Use this symbol in `frame-title-format' or another mode line construct.
+It is empty when `eyebrowse-mode' is disabled or its indicator is hidden.
+After changing indicator options with `setq', run
+`eyebrowse-indicator-change-hook' to refresh it.")
+
+(defvar eyebrowse--installed-indicator nil
+  "Installed indicator entry or wrapper, owned by Eyebrowse.")
+(defvar eyebrowse--indicator-variable nil
+  "Variable containing the automatically installed indicator.")
+(defvar eyebrowse--saved-indicator-format nil
+  "Format before the automatic indicator was installed.")
+
+(defun eyebrowse--uninstall-indicator ()
+  "Remove the automatic indicator, preserving unrelated format changes."
+  (when eyebrowse--indicator-variable
+    (let ((current (default-value eyebrowse--indicator-variable)))
+      (cond
+       ((eq eyebrowse--indicator-variable 'mode-line-misc-info)
+        (when (listp current)
+          (let ((remaining (remq eyebrowse--installed-indicator current)))
+            (set-default eyebrowse--indicator-variable
+                         (if (equal remaining
+                                    (if (listp eyebrowse--saved-indicator-format)
+                                        eyebrowse--saved-indicator-format
+                                      (list eyebrowse--saved-indicator-format)))
+                             eyebrowse--saved-indicator-format
+                           remaining)))))
+       ((eq current eyebrowse--installed-indicator)
+        (set-default eyebrowse--indicator-variable
+                     eyebrowse--saved-indicator-format)))))
+  (setq eyebrowse--installed-indicator nil
+        eyebrowse--indicator-variable nil
+        eyebrowse--saved-indicator-format nil))
+
+(defun eyebrowse--install-indicator ()
+  "Install the display selected by `eyebrowse-indicator-target'."
+  (eyebrowse--uninstall-indicator)
+  (let ((variable (cdr (assq eyebrowse-indicator-target
+                             '((mode-line . mode-line-misc-info)
+                               (header-line . header-line-format)
+                               (frame-title . frame-title-format))))))
+    (when variable
+      (setq eyebrowse--indicator-variable variable
+            eyebrowse--saved-indicator-format (default-value variable))
+      (let ((indicator (if (eq eyebrowse-indicator-target 'frame-title)
+                           'eyebrowse-indicator-string
+                         '(eyebrowse-mode
+                           (:eval (eyebrowse-mode-line-indicator))))))
+        (if (eq eyebrowse-indicator-target 'mode-line)
+            (progn
+              (setq eyebrowse--installed-indicator indicator)
+              (set-default variable
+                           (append (if (listp eyebrowse--saved-indicator-format)
+                                       eyebrowse--saved-indicator-format
+                                     (list eyebrowse--saved-indicator-format))
+                                   (list indicator))))
+          (setq eyebrowse--installed-indicator
+                (list (or eyebrowse--saved-indicator-format "") indicator))
+          (set-default variable eyebrowse--installed-indicator))))))
+
+(defun eyebrowse--update-indicator ()
+  "Refresh `eyebrowse-indicator-string' for the selected frame."
+  (let ((indicator (if (bound-and-true-p eyebrowse-mode)
+                       (substring-no-properties (eyebrowse-mode-line-indicator))
+                     "")))
+    (setq eyebrowse-indicator-string
+          (if (equal indicator "") ""
+            (format eyebrowse-indicator-format indicator))))
+  (force-mode-line-update t))
+
+(add-hook 'eyebrowse-indicator-change-hook #'eyebrowse--update-indicator -90)
 (add-function :after after-focus-change-function #'(lambda () (run-hooks 'eyebrowse-indicator-change-hook)))
 (advice-add 'delete-frame :after
             #'(lambda (&rest _) (run-hooks 'eyebrowse-indicator-change-hook)))
@@ -1191,13 +1291,13 @@ behaviour of `ranger`, a file manager."
           (if after-init-time
               (eyebrowse--restore-window-configs)
             (add-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs 90)))
-        (unless (assoc 'eyebrowse-mode mode-line-misc-info)
-          (push '(eyebrowse-mode (:eval (eyebrowse-mode-line-indicator)))
-                (cdr (last mode-line-misc-info)))))
+        (eyebrowse--install-indicator))
+    (eyebrowse--uninstall-indicator)
     (remove-hook 'after-make-frame-functions 'eyebrowse-init)
     (remove-hook 'kill-emacs-hook 'eyebrowse--save-window-configs)
     (remove-hook 'desktop-save-hook 'eyebrowse--save-window-configs)
-    (remove-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs)))
+    (remove-hook 'emacs-startup-hook 'eyebrowse--restore-window-configs))
+  (run-hooks 'eyebrowse-indicator-change-hook))
 
 (provide 'eyebrowse)
 ;;; eyebrowse.el ends here
