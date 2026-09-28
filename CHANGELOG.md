@@ -12,6 +12,7 @@ All notable changes to this fork of
   frame title, or manual placement (`nil`).
 - Cached plain-text `eyebrowse-indicator-string` for frame titles and manual
   placement, with `eyebrowse-indicator-format` for padding or separators.
+- `eyebrowse-buffer-slots` lists the slots whose window configs show a buffer.
 
 ### Changed
 

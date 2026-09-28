@@ -412,6 +412,28 @@ If FRAME is nil, use current frame.  TYPE can be any of
     "Get the current slot number."
     (eyebrowse--get 'current-slot))
 
+(defun eyebrowse-buffer-slots (buffer-or-name &optional frame)
+  "Return the sorted slots on FRAME whose window configs show BUFFER-OR-NAME.
+If FRAME is nil, use the current frame.  The current slot is checked
+against FRAME's live windows, since its saved config may be stale."
+  (let ((buffer (get-buffer buffer-or-name))
+        (current (eyebrowse--get 'current-slot frame))
+        slots)
+    (when buffer
+      (when (and current (get-buffer-window-list buffer t (or frame (selected-frame))))
+        (push current slots))
+      (dolist (window-config (eyebrowse--get 'window-configs frame))
+        (unless (eq (car window-config) current)
+          (catch 'found
+            (eyebrowse--walk-window-config
+             window-config
+             (lambda (item)
+               (when (and (eq (car item) 'buffer)
+                          (equal (cadr item) (buffer-name buffer)))
+                 (push (car window-config) slots)
+                 (throw 'found t))))))))
+    (sort slots #'<)))
+
 (defun eyebrowse-init (&optional frame)
   "Initialize Eyebrowse for the current frame."
   (unless (eyebrowse--get 'window-configs frame)
